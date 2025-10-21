@@ -1,0 +1,105 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Left Controls</title>
+  <style>
+    :root { --accent: #0b74de; --muted: #6b7280; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: #fafbfd;
+      height: 100%;
+      display: flex;
+      align-items: start;
+      justify-content: center;
+      padding: 18px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 240px;
+      background: white;
+      border-radius: 10px;
+      padding: 14px;
+      box-shadow: 0 6px 14px rgba(10,20,40,0.06);
+      border: 1px solid rgba(15,23,42,0.04);
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: 0;
+      font-weight: 600;
+      cursor: pointer;
+      color: white;
+    }
+
+    .btn-primary { background: var(--accent); }
+    .btn-secondary { background: #0ea5a6; }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <button id="btnLoadHello" class="btn btn-primary">Load Hello</button>
+    <button id="btnLoadTime" class="btn btn-secondary">Load Time</button>
+
+    <div class="small">These buttons send a message to the parent which forwards to the viewer iframe.</div>
+  </div>
+
+  <script type="module">
+    const btnHello = document.getElementById('btnLoadHello');
+    const btnTime = document.getElementById('btnLoadTime');
+
+    // Utility to send structured message to parent
+    const sendToParent = (type, payload = null) => {
+      window.parent.postMessage({ from: 'left', type, payload }, '*');
+    };
+
+    btnHello.addEventListener('click', () => {
+      sendToParent('loadHtml', {
+        title: 'Hello from Left',
+        body: '<h2 style="color:#0b74de;margin:0">Hello!</h2><p>This content was sent from the left iframe.</p>'
+      });
+    });
+
+    btnTime.addEventListener('click', () => {
+      const now = new Date();
+      sendToParent('loadHtml', {
+        title: 'Current Time',
+        body: `<p style="margin:0;font-weight:600">Local time: ${now.toLocaleString()}</p>`
+      });
+    });
+
+    // Optional: listen for ack messages from parent (forwarded from right)
+    window.addEventListener('message', evt => {
+      const msg = evt.data;
+      if (!msg || msg.from !== 'parent') return;
+      if (msg.type === 'ack') {
+        // show a quick visual cue (for demo only)
+        const prev = document.querySelector('.ack');
+        if (prev) prev.remove();
+        const el = document.createElement('div');
+        el.className = 'ack';
+        el.textContent = 'Viewer acknowledged update';
+        el.style.marginTop = '8px';
+        el.style.fontSize = '12px';
+        el.style.color = '#166534';
+        document.querySelector('.card').appendChild(el);
+        setTimeout(() => el.remove(), 2000);
+      }
+    });
+  </script>
+</body>
+</html>

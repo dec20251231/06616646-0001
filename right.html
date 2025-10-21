@@ -1,0 +1,119 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Right Viewer</title>
+  <style>
+    :root { --muted: #6b7280; --accent: #0b74de; }
+    html,body { height: 100%; margin: 0; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .wrap {
+      height: 100%;
+      display: flex;
+      align-items: start;
+      justify-content: center;
+      padding: 18px;
+      box-sizing: border-box;
+      background: linear-gradient(180deg,#ffffff,#fbfdff);
+    }
+    .viewer {
+      width: 100%;
+      max-width: 760px;
+      min-height: 220px;
+      border-radius: 10px;
+      padding: 18px;
+      background: linear-gradient(180deg, #ffffff, #fcfcff);
+      border: 1px solid rgba(15,23,42,0.04);
+      box-shadow: 0 10px 24px rgba(10,20,40,0.06);
+    }
+
+    .meta {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      margin-bottom:12px;
+    }
+
+    .meta .title {
+      font-weight:700;
+      color: var(--accent);
+      font-size:16px;
+    }
+
+    .content {
+      padding: 8px 4px;
+      color: #0f172a;
+    }
+
+    .hint {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="viewer" id="viewer">
+      <div class="meta">
+        <div class="title" id="vTitle">Ready</div>
+      </div>
+      <div class="content" id="vContent">
+        <p class="hint">Waiting for content from the left controls. Click a button on the left to load dynamic content here.</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    const vTitle = document.getElementById('vTitle');
+    const vContent = document.getElementById('vContent');
+
+    // Handler to receive forwarded messages from parent
+    window.addEventListener('message', event => {
+      const msg = event.data;
+      if (!msg || msg.from !== 'parent') return;
+
+      // Only handle messages of type loadHtml for this demo
+      if (msg.type === 'loadHtml' && msg.payload) {
+        const { title, body } = msg.payload;
+        vTitle.textContent = title ?? 'Untitled';
+        // Insert provided HTML safely by sanitizing simple tags (lightweight demo)
+        // NOTE: For production use a robust sanitizer like DOMPurify
+        vContent.innerHTML = sanitizeHtml(body ?? '');
+
+        // Send an acknowledgement back to the parent then parent will forward to left
+        window.parent.postMessage({ from: 'right', type: 'ack', payload: { title } }, '*');
+      }
+    });
+
+    // Very small sanitizer to allow limited tags (b, i, strong, em, p, h1-h6, br, a)
+    function sanitizeHtml(html) {
+      const allowedTags = ['B','I','STRONG','EM','P','BR','H1','H2','H3','H4','H5','H6','A','SPAN'];
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = html || '';
+      const walker = document.createTreeWalker(wrapper, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, null, false);
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      nodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) return;
+        if (!allowedTags.includes(node.nodeName)) {
+          // replace disallowed element with its text content
+          const text = document.createTextNode(node.textContent);
+          node.parentNode.replaceChild(text, node);
+        } else if (node.nodeName === 'A') {
+          // sanitize anchor: keep href but disallow javascript:
+          const href = node.getAttribute('href') || '';
+          if (/^\s*javascript:/i.test(href)) {
+            node.removeAttribute('href');
+          } else {
+            // restrict target to _blank for safety
+            node.setAttribute('target','_blank');
+            node.setAttribute('rel','noopener noreferrer');
+          }
+        }
+      });
+      return wrapper.innerHTML;
+    }
+  </script>
+</body>
+</html>
